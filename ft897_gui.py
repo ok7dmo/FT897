@@ -82,16 +82,21 @@ class FT897CAT:
                 print(f"Chyba při čtení ze sériového portu: {e}")
                 return None
 
-    def get_frequency(self):
+    def get_frequency_and_mode(self):
+        """Return tuple of (frequency in Hz, mode byte)."""
         if not self._send(b'\x00\x00\x00\x00\x03'):
-            return None
+            return None, None
         resp = self._read(5)
         if not resp or len(resp) != 5:
-            return None
+            return None, None
         units_10hz = 0
         for b in resp[:4]:
             units_10hz = units_10hz * 100 + ((b >> 4) & 0x0F) * 10 + (b & 0x0F)
-        return units_10hz * 10  # Hz
+        return units_10hz * 10, resp[4]
+
+    def get_frequency(self):
+        freq, _mode = self.get_frequency_and_mode()
+        return freq
 
     def set_frequency(self, freq_hz):
         """Set the VFO frequency in Hz."""
@@ -120,7 +125,7 @@ class FT897CAT:
 
 
 class StatusThread(QThread):
-    status_updated = pyqtSignal(int, int)  # frequency in Hz, smeter level
+    status_updated = pyqtSignal(int, int, int)  # frequency Hz, S-meter, mode
 
     def __init__(self, cat: FT897CAT):
         super().__init__()
@@ -131,11 +136,12 @@ class StatusThread(QThread):
         self.running = True
         while self.running:
             if self.cat.is_connected:
-                freq = self.cat.get_frequency()
+                freq, mode = self.cat.get_frequency_and_mode()
                 sm = self.cat.get_smeter()
                 if freq is not None and 100000 <= freq <= 500000000:
                     sm = sm if sm is not None else -1
-                    self.status_updated.emit(freq, sm)
+                    mode = mode if mode is not None else -1
+                    self.status_updated.emit(freq, sm, mode)
             self.msleep(300)
 
     def stop(self):
@@ -161,6 +167,7 @@ class RadioControlApp(QMainWindow):
         self.freq_text = "000,00000"
         self.current_theme = "dark"
         self.last_valid_frequency = None
+        self.last_mode = None
 
         self.band_definitions = [
             ((87500, 108000), "FM rozhlas"),
@@ -409,10 +416,11 @@ class RadioControlApp(QMainWindow):
             self.ptt_btn.setEnabled(False)
             self.connect_btn.setText("Připojit")
 
-    def update_status(self, freq_hz, sm_level):
+    def update_status(self, freq_hz, sm_level, mode):
         if freq_hz is None:
             return
         self.last_valid_frequency = freq_hz
+        self.last_mode = mode
         freq_mhz = freq_hz / 1_000_000.0
         formatted = f"{freq_mhz:.5f}".replace('.', ',')
         self.freq_label.setText(formatted)
@@ -476,8 +484,8 @@ class RadioControlApp(QMainWindow):
         if self.last_valid_frequency is None:
             return
         freq_khz = self.last_valid_frequency / 1000.0
-        for (start, _), _label in self.band_definitions:
-            if start <= freq_khz:
+        for (start, end), _label in self.band_definitions:
+            if start <= freq_khz <= end:
                 self.cat.set_frequency(int(start * 1000))
                 break
 
