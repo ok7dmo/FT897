@@ -34,6 +34,6 @@ By default the GUI lists available COM ports and common CAT baud rates (4800,
 ### PL2303 notes
 
 The popular Prolific PL‑2303 USB‑to‑serial adapter works with the FT‑897 using
-standard 8 data bits, no parity and **two** stop bits. Set the radio and the
+standard 8 data bits, no parity and **one** stop bit. Set the radio and the
 software to the same baud rate (usually 9600) and ensure the Prolific drivers
 are installed on Windows.
