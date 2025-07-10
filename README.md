@@ -30,6 +30,8 @@ Replace `<path_to_PyQt5>` with your local PyQt5 installation path.
 
 By default the GUI lists available COM ports and common CAT baud rates (4800,
 9600, 38400). Select the correct speed for your transceiver before connecting.
+The software queries the radio's frequency using the standard **FA** command and
+falls back to **IF** if needed.
 
 ### PL2303 notes
 

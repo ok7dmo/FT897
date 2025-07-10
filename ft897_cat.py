@@ -72,20 +72,33 @@ class FT897CAT:
             # responses terminate with ';'
             return self.serial.read_until(b';')
 
-    def get_frequency(self) -> Optional[float]:
-        """Query current frequency in Hz."""
-        try:
-            data = self._query(b"FA;")  # typical Yaesu command
-        except serial.SerialException:
-            return None
-        if not data:
-            return None
-        # Expect b'FA00014070000;'
+    def _parse_frequency(self, data: bytes) -> Optional[float]:
+        """Extract frequency digits from a CAT reply."""
         digits = bytes([b for b in data if 48 <= b <= 57])
+        if not digits:
+            return None
+        # Many commands return 11 BCD digits
+        if len(digits) >= 11:
+            digits = digits[:11]
         try:
             return float(int(digits)) / 1e6
         except (ValueError, TypeError):
             return None
+
+    def get_frequency(self) -> Optional[float]:
+        """Query current frequency in MHz.
+
+        Tries the FA command first, then falls back to IF.
+        """
+        for cmd in (b"FA;", b"IF;"):
+            try:
+                data = self._query(cmd)
+            except serial.SerialException:
+                return None
+            freq = self._parse_frequency(data)
+            if freq is not None:
+                return freq
+        return None
 
     def get_smeter(self) -> Optional[int]:
         """Query S-meter level."""
