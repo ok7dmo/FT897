@@ -33,7 +33,7 @@ class FT897CAT:
                 bytesize=8,
                 parity=serial.PARITY_NONE,
                 stopbits=2,
-                timeout=0.3,
+                timeout=1,
                 rtscts=False,
                 dsrdtr=False,
             )
@@ -64,8 +64,8 @@ class FT897CAT:
             self.serial.write(cmd)
             if reply_bytes:
                 return self.serial.read(reply_bytes)
-            # read until ';'
-            return self.serial.readline()
+            # responses terminate with ';'
+            return self.serial.read_until(b';')
 
     def get_frequency(self) -> Optional[float]:
         """Query current frequency in Hz."""
