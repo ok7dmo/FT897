@@ -27,3 +27,6 @@ pyinstaller --onefile --windowed --add-data "<path_to_PyQt5>\\Qt5Core.dll;." ft8
 ```
 
 Replace `<path_to_PyQt5>` with your local PyQt5 installation path.
+
+By default the GUI lists available COM ports and common CAT baud rates (4800,
+9600, 38400). Select the correct speed for your transceiver before connecting.

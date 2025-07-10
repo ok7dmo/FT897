@@ -9,7 +9,7 @@ class MainWindow(QtWidgets.QMainWindow):
     frequency_changed = QtCore.pyqtSignal(float, str)
     smeter_changed = QtCore.pyqtSignal(int)
     swr_changed = QtCore.pyqtSignal(float)
-    connect_clicked = QtCore.pyqtSignal(str)
+    connect_clicked = QtCore.pyqtSignal(str, int)
     disconnect_clicked = QtCore.pyqtSignal()
     ptt_pressed = QtCore.pyqtSignal(bool)
 
@@ -55,9 +55,14 @@ class MainWindow(QtWidgets.QMainWindow):
 
         hbox = QtWidgets.QHBoxLayout()
         self.com_combo = QtWidgets.QComboBox()
+        self.speed_combo = QtWidgets.QComboBox()
+        for rate in (4800, 9600, 38400):
+            self.speed_combo.addItem(str(rate))
+        self.speed_combo.setCurrentText("9600")
         self.connect_btn = QtWidgets.QPushButton("Connect")
         self.connect_btn.clicked.connect(self._on_connect)
         hbox.addWidget(self.com_combo)
+        hbox.addWidget(self.speed_combo)
         hbox.addWidget(self.connect_btn)
         vbox.addLayout(hbox)
 
@@ -100,12 +105,15 @@ class MainWindow(QtWidgets.QMainWindow):
     def _on_connect(self) -> None:
         if self.connect_btn.text() == "Connect":
             port = self.com_combo.currentText()
-            self.connect_clicked.emit(port)
+            baud = int(self.speed_combo.currentText())
+            self.connect_clicked.emit(port, baud)
         else:
             self.disconnect_clicked.emit()
 
     def set_connected(self, connected: bool) -> None:
         self.connect_btn.setText("Disconnect" if connected else "Connect")
+        self.com_combo.setEnabled(not connected)
+        self.speed_combo.setEnabled(not connected)
 
     def update_frequency(self, freq_mhz: float, band: str) -> None:
         text = f"{freq_mhz:07.5f} MHz"

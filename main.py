@@ -82,9 +82,9 @@ class App(QtWidgets.QApplication):
             self.window.com_combo.setCurrentIndex(idx)
         self.window.com_combo.blockSignals(False)
 
-    def connect_port(self, port: str) -> None:
+    def connect_port(self, port: str, baud: int) -> None:
         try:
-            self.cat.open(port)
+            self.cat.open(port, baud)
         except Exception as exc:  # noqa: BLE001
             QtWidgets.QMessageBox.critical(self.window, "Error", str(exc))
             return

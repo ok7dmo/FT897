@@ -22,14 +22,14 @@ class FT897CAT:
             (28.0e6, 29.7e6, "10m"),
         ]
 
-    def open(self, port: str) -> None:
+    def open(self, port: str, baudrate: int = 9600) -> None:
         """Open the serial port."""
         if self.serial and self.serial.is_open:
             self.close()
         try:
             self.serial = serial.Serial(
                 port=port,
-                baudrate=9600,
+                baudrate=baudrate,
                 bytesize=8,
                 parity=serial.PARITY_NONE,
                 stopbits=2,
