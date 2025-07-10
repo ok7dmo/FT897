@@ -42,7 +42,8 @@ class PollThread(QtCore.QThread):
                     self.swr_updated.emit(swr)
             except Exception as exc:  # noqa: BLE001
                 self.error_occurred.emit(str(exc))
-            time.sleep(0.3)
+            # Sleep using QThread.msleep for accurate timing without busy wait
+            self.msleep(300)
 
     def stop(self) -> None:
         self._running.clear()
