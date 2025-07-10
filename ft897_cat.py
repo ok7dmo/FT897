@@ -61,7 +61,9 @@ class FT897CAT:
         if not self.serial or not self.serial.is_open:
             raise IOError("Serial port not open")
         with self.lock:
+            self.serial.reset_input_buffer()
             self.serial.write(cmd)
+            self.serial.flush()
             if reply_bytes:
                 return self.serial.read(reply_bytes)
             # responses terminate with ';'
@@ -76,7 +78,7 @@ class FT897CAT:
         if not data:
             return None
         # Expect b'FA00014070000;'
-        digits = b"".join(filter(bytes.isdigit, data))
+        digits = bytes([b for b in data if 48 <= b <= 57])
         try:
             return float(int(digits)) / 1e6
         except (ValueError, TypeError):
@@ -88,7 +90,7 @@ class FT897CAT:
             data = self._query(b"SM;")
         except serial.SerialException:
             return None
-        digits = b"".join(filter(bytes.isdigit, data))
+        digits = bytes([b for b in data if 48 <= b <= 57])
         try:
             return int(digits)
         except (ValueError, TypeError):
@@ -100,7 +102,7 @@ class FT897CAT:
             data = self._query(b"SW;")
         except serial.SerialException:
             return None
-        digits = b"".join(filter(bytes.isdigit, data))
+        digits = bytes([b for b in data if 48 <= b <= 57])
         try:
             return float(digits) / 10.0
         except (ValueError, TypeError):
