@@ -27,14 +27,14 @@ class FT897CAT:
         if self.serial and self.serial.is_open:
             self.close()
         try:
-            # PL2303 USB converters work with standard 8 data bits, no parity and
-            # one stop bit as required by the FT‑897 CAT interface.
+            # PL2303 USB converters use standard 8 data bits, no parity and two
+            # stop bits as required by the FT‑897 CAT interface.
             self.serial = serial.Serial(
                 port=port,
                 baudrate=baudrate,
                 bytesize=serial.EIGHTBITS,
                 parity=serial.PARITY_NONE,
-                stopbits=serial.STOPBITS_ONE,
+                stopbits=serial.STOPBITS_TWO,
                 timeout=1,
                 write_timeout=1,
                 rtscts=False,

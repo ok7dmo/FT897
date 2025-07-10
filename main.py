@@ -70,6 +70,7 @@ class App(QtWidgets.QApplication):
         self.port_timer.timeout.connect(self.refresh_ports)
         self.port_timer.start()
         self.window.show()
+        self.aboutToQuit.connect(self.cleanup)
 
     def refresh_ports(self) -> None:
         current = self.window.com_combo.currentText()
@@ -127,11 +128,12 @@ class App(QtWidgets.QApplication):
         QtWidgets.QMessageBox.warning(self.window, "Serial Error", message)
         self.disconnect_port()
 
-    def aboutToQuit(self) -> None:  # type: ignore[override]
+    def cleanup(self) -> None:
+        """Handle application exit."""
         if self.poll_thread and self.poll_thread.isRunning():
             self.poll_thread.stop()
         self.cat.close()
-        super().aboutToQuit()
+
 
 
 def main() -> None:
