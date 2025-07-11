@@ -22,7 +22,7 @@ import serial
 import serial.tools.list_ports
 
 from PyQt5.QtWidgets import (
-    QApplication, QMainWindow, QWidget, QVBoxLayout, QLabel,
+    QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel,
     QPushButton, QComboBox, QMessageBox, QAction, QSizePolicy, QFontDialog,
     QDialog, QRadioButton, QDialogButtonBox, QTabWidget, QFrame
 )
@@ -196,7 +196,11 @@ class RadioControlApp(QMainWindow):
 
         self.resize_timer = QTimer(self)
         self.resize_timer.setSingleShot(True)
+        self.resize_timer.setInterval(150)
         self.resize_timer.timeout.connect(self.adjust_all_fonts)
+
+        self.band_order = []
+        self.current_band_index = None
 
         self.current_font_family = "Courier New"
         self.freq_text = "000,00000"
@@ -241,6 +245,7 @@ class RadioControlApp(QMainWindow):
             "2 m": [("145.500 MHz", 145500000, 0x08)],
             "70 cm": [("433.500 MHz", 433500000, 0x08)],
         }
+        self.band_order = list(self.band_presets.keys())
         self.init_ui()
         self.apply_stylesheet(self.current_theme)
 
@@ -261,6 +266,20 @@ class RadioControlApp(QMainWindow):
         self.connect_btn = QPushButton("Připojit")
         self.connect_btn.clicked.connect(self.toggle_connection)
         self.layout.addWidget(self.connect_btn)
+
+        # Band control buttons
+        self.band_control = QFrame()
+        self.band_layout = QHBoxLayout(self.band_control)
+        self.band_down_btn = QPushButton("Pásmo dolů")
+        self.band_home_btn = QPushButton("Pásmo domů")
+        self.band_up_btn = QPushButton("Pásmo nahoru")
+        self.band_down_btn.clicked.connect(self.band_down)
+        self.band_home_btn.clicked.connect(self.band_home)
+        self.band_up_btn.clicked.connect(self.band_up)
+        for b in (self.band_down_btn, self.band_home_btn, self.band_up_btn):
+            self.band_layout.addWidget(b)
+            b.setEnabled(False)
+        self.layout.addWidget(self.band_control)
 
 
 
@@ -470,6 +489,8 @@ class RadioControlApp(QMainWindow):
             if self.cat.connect(port):
                 self.status_thread.start()
                 self.ptt_btn.setEnabled(True)
+                for b in (self.band_down_btn, self.band_home_btn, self.band_up_btn):
+                    b.setEnabled(True)
                 self.connect_btn.setText("Odpojit")
             else:
                 QMessageBox.warning(self, "Chyba", "Nelze se připojit.")
@@ -478,6 +499,8 @@ class RadioControlApp(QMainWindow):
             self.status_thread.wait()
             self.cat.disconnect()
             self.ptt_btn.setEnabled(False)
+            for b in (self.band_down_btn, self.band_home_btn, self.band_up_btn):
+                b.setEnabled(False)
             self.connect_btn.setText("Připojit")
 
     def update_status(self, freq_hz, sm_level, mode):
@@ -489,7 +512,10 @@ class RadioControlApp(QMainWindow):
         formatted = f"{freq_mhz:.5f}".replace('.', ',')
         self.freq_label.setText(formatted)
         freq_khz = freq_hz / 1000.0
-        self.band_label.setText(f"Pásmo: {self.get_band_label_from_khz(freq_khz)}")
+        band = self.get_band_label_from_khz(freq_khz)
+        self.band_label.setText(f"Pásmo: {band}")
+        if band in self.band_presets:
+            self.current_band_index = self.band_order.index(band)
         if sm_level >= 0:
             self.last_smeter = sm_level
         if self.last_smeter is not None:
@@ -529,12 +555,38 @@ class RadioControlApp(QMainWindow):
         self.cat.ptt_off()
         self.ptt_container.setStyleSheet("")
 
+    def band_home(self):
+        if self.current_band_index is None:
+            return
+        label = self.band_order[self.current_band_index]
+        freq, mode = self.band_presets[label][0][1], self.band_presets[label][0][2]
+        self.goto_band(freq, mode)
+
+    def band_up(self):
+        if self.current_band_index is None:
+            return
+        if self.current_band_index + 1 < len(self.band_order):
+            self.current_band_index += 1
+            self.band_home()
+
+    def band_down(self):
+        if self.current_band_index is None:
+            return
+        if self.current_band_index > 0:
+            self.current_band_index -= 1
+            self.band_home()
+
 
     def goto_band(self, freq_hz, mode_code):
         if not self.cat.is_connected:
             return
         self.cat.set_frequency(freq_hz)
         self.cat.set_mode(mode_code)
+        # update current band index based on requested frequency
+        freq_khz = freq_hz / 1000
+        band = self.get_band_label_from_khz(freq_khz)
+        if band in self.band_presets:
+            self.current_band_index = self.band_order.index(band)
 
     def closeEvent(self, event):
         self.status_thread.stop()
