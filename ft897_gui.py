@@ -486,10 +486,13 @@ class RadioControlApp(QMainWindow):
             return best
 
         freq_size = best_size(self.freq_label, sample_freq)
-        sm_size = best_size(self.smeter_label, sample_sm)
+        # Use the same font size for the S-meter label. If the size would not
+        # fit, fall back to the largest size that does.
+        sm_best = best_size(self.smeter_label, sample_sm)
+        final_size = min(freq_size, sm_best)
 
-        self.cached_freq_font = QFont(self.current_font_family, freq_size, QFont.Bold)
-        self.cached_smeter_font = QFont(self.current_font_family, sm_size, QFont.Bold)
+        self.cached_freq_font = QFont(self.current_font_family, final_size, QFont.Bold)
+        self.cached_smeter_font = QFont(self.current_font_family, final_size, QFont.Bold)
 
         self.freq_label.setFont(self.cached_freq_font)
         self.smeter_label.setFont(self.cached_smeter_font)
