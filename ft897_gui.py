@@ -474,10 +474,11 @@ class RadioControlApp(QMainWindow):
         self.adjust_all_fonts()
 
     def adjust_all_fonts(self, fix_min=False):
-        """Adjust fonts to fit current label sizes.
+        """Adjust fonts to fit the current label sizes.
 
-        When *fix_min* is True, also update the minimum sizes of the labels
-        based on a worst case string so the layout remains stable.
+        When *fix_min* is ``True`` this also updates the minimum dimensions
+        of the frequency and S-meter labels so they always have enough space
+        for the worst case text using the chosen font size.
         """
         sample_freq = "999,99999"
         sample_sm = "S-metr: S9+60"
@@ -507,22 +508,23 @@ class RadioControlApp(QMainWindow):
         sm_size = best_size(self.smeter_label, sample_sm)
         band_size = best_size(self.band_label, sample_band)
 
-        freq_font = QFont(self.current_font_family, freq_size, QFont.Bold)
-        sm_font = QFont(self.current_font_family, sm_size, QFont.Bold)
+        # Use the largest size that fits both the frequency and S-meter labels
+        common_size = min(freq_size, sm_size)
+
+        freq_font = QFont(self.current_font_family, common_size, QFont.Bold)
         band_font = QFont(self.current_font_family, band_size, QFont.Bold)
 
         self.cached_freq_font = freq_font
-        self.cached_smeter_font = sm_font
+        self.cached_smeter_font = freq_font
         self.band_label.setFont(band_font)
 
         self.freq_label.setFont(freq_font)
-        self.smeter_label.setFont(sm_font)
+        self.smeter_label.setFont(freq_font)
 
         if fix_min:
-            freq_metrics = QFontMetrics(freq_font)
-            sm_metrics = QFontMetrics(sm_font)
-            freq_rect = freq_metrics.boundingRect(sample_freq)
-            sm_rect = sm_metrics.boundingRect(sample_sm)
+            metrics = QFontMetrics(freq_font)
+            freq_rect = metrics.boundingRect(sample_freq)
+            sm_rect = metrics.boundingRect(sample_sm)
             margin = 20
             min_w = max(freq_rect.width(), sm_rect.width()) + margin
             self.freq_label.setMinimumWidth(min_w)
