@@ -22,7 +22,7 @@ import serial
 import serial.tools.list_ports
 
 from PyQt5.QtWidgets import (
-    QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel,
+    QApplication, QMainWindow, QWidget, QVBoxLayout, QLabel,
     QPushButton, QComboBox, QMessageBox, QAction, QSizePolicy, QFontDialog,
     QDialog, QRadioButton, QDialogButtonBox, QTabWidget, QFrame
 )
@@ -262,17 +262,7 @@ class RadioControlApp(QMainWindow):
         self.connect_btn.clicked.connect(self.toggle_connection)
         self.layout.addWidget(self.connect_btn)
 
-        btn_row = QHBoxLayout()
-        self.band_down_btn = QPushButton("Pásmo dolů")
-        self.band_home_btn = QPushButton("Pásmo domů")
-        self.band_up_btn = QPushButton("Pásmo nahoru")
-        self.band_down_btn.clicked.connect(self.band_down)
-        self.band_home_btn.clicked.connect(self.band_home)
-        self.band_up_btn.clicked.connect(self.band_up)
-        btn_row.addWidget(self.band_down_btn)
-        btn_row.addWidget(self.band_home_btn)
-        btn_row.addWidget(self.band_up_btn)
-        self.layout.addLayout(btn_row)
+
 
         self.tabs = QTabWidget()
         self.layout.addWidget(self.tabs)
@@ -539,33 +529,6 @@ class RadioControlApp(QMainWindow):
         self.cat.ptt_off()
         self.ptt_container.setStyleSheet("")
 
-    def band_up(self):
-        self._change_band(step=1)
-
-    def band_down(self):
-        self._change_band(step=-1)
-
-    def band_home(self):
-        self._change_band(step=0)
-
-    def _change_band(self, step):
-        if self.last_valid_frequency is None:
-            return
-        freq_khz = self.last_valid_frequency // 1000
-        for i, ((start, end), label) in enumerate(self.band_definitions):
-            if start <= freq_khz <= end:
-                if step == 0:
-                    target_label = label
-                else:
-                    idx = i + step
-                    if idx < 0 or idx >= len(self.band_definitions):
-                        return
-                    target_label = self.band_definitions[idx][1]
-                preset = self.band_presets.get(target_label)
-                if preset:
-                    freq, mode = preset[0][1], preset[0][2]
-                    self.goto_band(freq, mode)
-                return
 
     def goto_band(self, freq_hz, mode_code):
         if not self.cat.is_connected:
