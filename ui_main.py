@@ -31,9 +31,9 @@ from resources import MODE_CODES, MODE_NAMES, band_definitions, band_menu_items
 class RadioControlApp(QMainWindow):
     """Main window class."""
 
-    def __init__(self):
+    def __init__(self, debug: bool = False):
         super().__init__()
-        self.cat = FT897CAT()
+        self.cat = FT897CAT(debug=debug)
 
         self.status_timer = QTimer(self)
         # poll more responsively but with modest CPU impact

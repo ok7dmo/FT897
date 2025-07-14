@@ -4,17 +4,26 @@ import threading
 import time
 from typing import Optional, Tuple
 
+import sys
+
 import serial
 
 
 class FT897CAT:
     """Minimal CAT control helper."""
 
-    def __init__(self):
+    def __init__(self, debug: bool = False):
         self.serial_port: Optional[serial.Serial] = None
         self.is_connected = False
         self._lock = threading.Lock()
         self.ptt_active = False
+        self.debug = debug
+
+    def _log(self, direction: str, data: bytes) -> None:
+        """Print raw communication bytes when debugging is enabled."""
+        if self.debug:
+            hex_str = " ".join(f"{b:02X}" for b in data)
+            print(f"{direction} {hex_str}")
 
     def connect(self, port: str, baudrate: int = 9600) -> bool:
         try:
@@ -45,6 +54,7 @@ class FT897CAT:
         try:
             # hold the lock only for the actual write to minimise blocking
             with self._lock:
+                self._log('>>', data)
                 self.serial_port.write(data)
                 self.serial_port.flush()
         except Exception as exc:
@@ -55,7 +65,10 @@ class FT897CAT:
     def _read(self, length: int = 5) -> Optional[bytes]:
         with self._lock:
             try:
-                return self.serial_port.read(length)
+                data = self.serial_port.read(length)
+                if data:
+                    self._log('<<', data)
+                return data
             except Exception as exc:
                 print(f"Read error: {exc}")
                 return None
