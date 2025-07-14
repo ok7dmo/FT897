@@ -42,9 +42,12 @@ class FT897CAT:
         if not self.serial_port:
             return False
         try:
+            # hold the lock only for the actual write
             with self._lock:
                 self.serial_port.write(data)
-                self.serial_port.flush()
+            # flush once the lock is released to keep the critical
+            # section short and reduce contention with reads
+            self.serial_port.flush()
         except Exception as exc:
             print(f"Write error: {exc}")
             return False
@@ -105,14 +108,6 @@ class FT897CAT:
     def repeater_minus(self) -> bool:
         return self._send(b"\x89\x09")
 
-    def get_meters(self) -> Tuple[Optional[int], Optional[int]]:
-        cmds = b"\x00\x00\x00\x00\xe7" + b"\x00\x00\x00\x00\xf7"
-        if not self._send(cmds):
-            return None, None
-        resp = self._read(4)
-        if not resp or len(resp) < 4:
-            return None, None
-        return resp[1], resp[3]
 
     def set_power(self, watts: int, band_label: str) -> bool:
         if band_label in {
@@ -164,22 +159,24 @@ class FT897CAT:
         return resp[1]
 
     def get_meter_block(self) -> Optional[bytes]:
-        """Read full 5-byte meter block using opcode 0xE7."""
-        if not self._send(b"\x00\x00\x00\x00\xE7"):
+        """Read full 5-byte meter block using the long 0xE7 command."""
+        # Use the explicit command sequence as documented: FE FE 44 00 E7 FD
+        if not self._send(b"\xFE\xFE\x44\x00\xE7\xFD"):
             return None
-        resp = self._read(5)
-        if not resp or len(resp) < 5:
+        resp = self._read(7)
+        if not resp or len(resp) < 7:
             return None
-        return resp
+        # Return only the five data bytes from the response
+        return resp[2:7]
 
     def get_s_and_power(self) -> Tuple[Optional[int], Optional[int]]:
         """Return S-meter and power meter values."""
         block = self.get_meter_block()
         s_val = block[0] if block else None
-        if not self._send(b"\x00\x00\x00\x00\xF7"):
+        if not self._send(b"\xFE\xFE\x44\x00\xF7\xFD"):
             return s_val, None
-        resp = self._read(2)
-        p_val = resp[1] if resp and len(resp) >= 2 else None
+        resp = self._read(6)
+        p_val = resp[4] if resp and len(resp) >= 6 else None
         return s_val, p_val
 
     def get_voltage(self) -> Optional[int]:

@@ -36,12 +36,12 @@ class RadioControlApp(QMainWindow):
         self.cat = FT897CAT()
 
         self.status_timer = QTimer(self)
-        # faster GUI response with moderate polling interval
-        self.status_timer.setInterval(300)
+        # moderate polling interval for status updates
+        self.status_timer.setInterval(400)
         self.status_timer.timeout.connect(self.update_status)
 
         self.ptt_heartbeat = QTimer(self)
-        self.ptt_heartbeat.setInterval(100)
+        self.ptt_heartbeat.setInterval(250)
         self.ptt_heartbeat.timeout.connect(self.cat.ptt_on)
 
         self.resize_timer = QTimer(self)
