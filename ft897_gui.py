@@ -396,28 +396,26 @@ class RadioControlApp(QMainWindow):
                 return label
         return f"Neznámé pásmo ({freq_khz/1000:.5f} MHz)"
 
-    # Seznam prahových hodnot pro S-metr (bajtové hodnoty 0–255):
-    #   - S0:     0 <= value < 16
-    #   - S1:    16 <= value < 32
-    #   - S2:    32 <= value < 48
-    #   - S3:    48 <= value < 64
-    #   - S4:    64 <= value < 80
-    #   - S5:    80 <= value < 96
-    #   - S6:    96 <= value <112
-    #   - S7:   112 <= value <128
-    #   - S8:   128 <= value <144
-    #   - S9:   144 <= value <=255 → pro hodnoty nad S9 přidej decibely:
+    # Seznam prahů pro S-metr na škále 0–255:
+    #   - S0:     0 ≤ value < 16
+    #   - S1:    16 ≤ value < 32
+    #   - S2:    32 ≤ value < 48
+    #   - S3:    48 ≤ value < 64
+    #   - S4:    64 ≤ value < 80
+    #   - S5:    80 ≤ value < 96
+    #   - S6:    96 ≤ value <112
+    #   - S7:   112 ≤ value <128
+    #   - S8:   128 ≤ value <144
+    #   - S9:   144 ≤ value ≤255 → pro hodnoty nad S9 spočítej „+dB“:
     #         extra = value - 144
     #         db = (extra // 32) * 10
-    #         výsledek = "S9+{db}"
+    #         výsledné označení = f"S9+{db}"
     #
     # Příklady:
-    #   value =  0   → "S0"
-    #   value = 30   → "S1"
-    #   value =100   → "S6"
-    #   value =200   → "S9+10"
+    #   s_val =  88 → "S5"
+    #   s_val = 184 → extra=40 → db=10 → "S9+10"
     def format_smeter(self, value):
-        """Return human friendly S meter value from 0-255."""
+        """Return human-friendly S-meter value from 0–255."""
         thresholds = [16 * i for i in range(1, 10)]
         if value < thresholds[0]:
             return "S0"
