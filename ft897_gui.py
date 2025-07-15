@@ -94,7 +94,6 @@ class FT897CAT:
 
     def get_smeter(self):
         """Read raw RX status byte and extract scaled S-meter value (0–255)."""
-        # Send command E7 and read response atomically under the lock
         with self._lock:
             try:
                 self.serial_port.reset_input_buffer()
@@ -106,17 +105,9 @@ class FT897CAT:
                 print(f"Chyba při čtení S-metu: {e}")
                 return None
 
-        # 2) resp is None or empty -> return None
         if not resp:
             return None
-
         raw = resp[0]
-
-        # 3) Squelch Status bit (1 means no signal)
-        if raw & 0x02:
-            return 0
-
-        # 4) bits 7–3 contain S-meter data 0–31; scale to 0–248
         s_raw = (raw & 0xF8) >> 3
         return s_raw * 8
 
