@@ -104,28 +104,19 @@ class FT897CAT:
         return units_10hz * 10  # Hz
 
     def get_smeter(self):
-        """Return S-meter level from CAT response or None on failure."""
-        with self._lock:
-            try:
-                self.serial_port.reset_input_buffer()
-                self.serial_port.reset_output_buffer()
-                self.serial_port.write(b"\x00\x00\x00\x00\xe7")
-                time.sleep(0.1)
-                resp = self.serial_port.read(5)
-                if not resp or len(resp) < 5:
-                    self.serial_port.reset_input_buffer()
-                    time.sleep(0.1)
-                    self.serial_port.write(b"\x00\x00\x00\x00\xe7")
-                    time.sleep(0.1)
-                    resp = self.serial_port.read(5)
-            except Exception as e:
-                print(f"Chyba při čtení S-metu: {e}")
-                return None
-
-        print(f"S-metr odpověď: {resp}")
-
-        if not resp or len(resp) < 5:
+        """Return S-meter level as 0-255 or None on failure."""
+        if not self._send(b"\x00\x00\x00\x00\xe7"):
             return None
+        resp = self._read(5)
+        if not resp or len(resp) < 5:
+            time.sleep(0.2)
+            more = self._read(5 - len(resp) if resp else 5)
+            if more:
+                resp = (resp or b"") + more
+        if not resp or len(resp) < 5:
+            print(f"Chybná odpověď S-metr: {resp}")
+            return None
+        print(f"S-metr: {resp}")
         return resp[1]
 
     def ptt_on(self):
