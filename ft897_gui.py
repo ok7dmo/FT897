@@ -36,6 +36,8 @@ class FT897CAT:
         self.serial_port = None
         self.is_connected = False
         self.ptt_active = False
+        self.port = None
+        self.baudrate = 9600
         self._lock = threading.Lock()
 
     def connect(self, port, baudrate=9600):
@@ -48,6 +50,8 @@ class FT897CAT:
                 stopbits=serial.STOPBITS_ONE,
                 timeout=1
             )
+            self.port = port
+            self.baudrate = baudrate
             self.is_connected = True
             return True
         except Exception as e:
@@ -58,6 +62,12 @@ class FT897CAT:
         if self.serial_port and self.serial_port.is_open:
             self.serial_port.close()
         self.is_connected = False
+
+    def reconnect(self):
+        if not self.port:
+            return False
+        self.disconnect()
+        return self.connect(self.port, self.baudrate)
 
     def _send(self, data: bytes):
         with self._lock:
@@ -473,6 +483,7 @@ class RadioControlApp(QMainWindow):
     def handle_ptt_on(self):
         if not self.cat.is_connected:
             return
+        self.cat.reconnect()
         self.cat.ptt_on()
         self.ptt_heartbeat.start()
         self.ptt_container.setStyleSheet("background-color: #600;")
@@ -481,6 +492,7 @@ class RadioControlApp(QMainWindow):
         if not self.cat.is_connected:
             return
         self.ptt_heartbeat.stop()
+        self.cat.reconnect()
         self.cat.ptt_off()
         self.ptt_container.setStyleSheet("")
 
