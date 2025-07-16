@@ -104,7 +104,7 @@ class FT897CAT:
         return units_10hz * 10  # Hz
 
     def get_smeter(self):
-        """Read raw RX status byte and return scaled S-meter value."""
+        """Read RX status and return scaled S-meter value from the 5th byte."""
         if self.ptt_active:
             return None
         with self._lock:
@@ -113,14 +113,14 @@ class FT897CAT:
                 self.serial_port.reset_output_buffer()
                 self.serial_port.write(b'\x00\x00\x00\x00\xe7')
                 time.sleep(0.1)
-                resp = self.serial_port.read(1)
+                resp = self.serial_port.read(5)
             except Exception as e:
                 print(f"Chyba při čtení S-metu: {e}")
                 return None
 
-        if not resp:
+        if not resp or len(resp) < 5:
             return None
-        raw = resp[0]
+        raw = resp[4]
         if raw & 0x02:
             return 0
         s_raw = (raw & 0xF8) >> 3
