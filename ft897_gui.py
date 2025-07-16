@@ -104,9 +104,7 @@ class FT897CAT:
         return units_10hz * 10  # Hz
 
     def get_smeter(self):
-        """Read RX status and return scaled S-meter value from the 5th byte."""
-        if self.ptt_active:
-            return None
+        """Read S-meter value using CAT command E7 and return byte 1."""
         with self._lock:
             try:
                 self.serial_port.reset_input_buffer()
@@ -118,13 +116,9 @@ class FT897CAT:
                 print(f"Chyba při čtení S-metu: {e}")
                 return None
 
-        if not resp or len(resp) < 5:
+        if not resp or len(resp) != 5:
             return None
-        raw = resp[4]
-        if raw & 0x02:
-            return 0
-        s_raw = (raw & 0xF8) >> 3
-        return s_raw * 8
+        return resp[1]
 
     def ptt_on(self):
         self.ptt_active = True
@@ -154,9 +148,7 @@ class StatusThread(QThread):
                 else:
                     freq = self.last_freq
 
-                sm = None
-                if not self.cat.ptt_active:
-                    sm = self.cat.get_smeter()
+                sm = self.cat.get_smeter()
 
                 if freq is not None or sm is not None:
                     sm_val = sm if sm is not None else -1
