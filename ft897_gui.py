@@ -103,21 +103,15 @@ class FT897CAT:
             units_10hz = units_10hz * 100 + ((b >> 4) & 0x0F) * 10 + (b & 0x0F)
         return units_10hz * 10  # Hz
 
-    def get_smeter(self):
-        """Return S-meter level as 0-255 or None on failure."""
+    def get_squelch_status(self):
+        """Return squelch status (True=open, False=closed) or None."""
         if not self._send(b"\x00\x00\x00\x00\xe7"):
             return None
-        resp = self._read(5)
-        if not resp or len(resp) < 5:
-            time.sleep(0.2)
-            more = self._read(5 - len(resp) if resp else 5)
-            if more:
-                resp = (resp or b"") + more
-        if not resp or len(resp) < 5:
-            print(f"Chybná odpověď S-metr: {resp}")
+        resp = self._read(2)
+        if not resp:
             return None
-        print(f"S-metr: {resp}")
-        return resp[1]
+        print(f"Squelch status: {resp[0]:08b}")
+        return bool(resp[0] & 0x02)
 
     def ptt_on(self):
         self.ptt_active = True
@@ -129,7 +123,7 @@ class FT897CAT:
 
 
 class StatusThread(QThread):
-    status_updated = pyqtSignal(object, int)  # frequency in Hz, S-meter level
+    status_updated = pyqtSignal(object, object)  # frequency in Hz, squelch status
 
     def __init__(self, cat: FT897CAT):
         super().__init__()
@@ -147,11 +141,10 @@ class StatusThread(QThread):
                 else:
                     freq = self.last_freq
 
-                sm = self.cat.get_smeter()
+                sq = self.cat.get_squelch_status()
 
-                if freq is not None or sm is not None:
-                    sm_val = sm if sm is not None else -1
-                    self.status_updated.emit(freq, sm_val)
+                if freq is not None or sq is not None:
+                    self.status_updated.emit(freq, sq)
             self.msleep(300)
 
     def stop(self):
@@ -413,7 +406,7 @@ class RadioControlApp(QMainWindow):
             self.ptt_btn.setEnabled(False)
             self.connect_btn.setText("Připojit")
 
-    def update_status(self, freq_hz, sm_level):
+    def update_status(self, freq_hz, sq_open):
         if freq_hz is not None:
             self.last_valid_frequency = freq_hz
             freq_mhz = freq_hz / 1_000_000.0
@@ -421,14 +414,13 @@ class RadioControlApp(QMainWindow):
             self.freq_label.setText(formatted)
             freq_khz = freq_hz / 1000.0
             self.band_label.setText(f"Pásmo: {self.get_band_label_from_khz(freq_khz)}")
-        if sm_level >= 0:
-            self.smeter_label.setText(f"S-metr: {self.format_smeter(sm_level)}")
-            self.squelch_status_label.setText(
-                "Šumová brána: otevřená" if sm_level > 0 else "Šumová brána: zavřená"
-            )
+        if sq_open is True:
+            self.squelch_status_label.setText("Šumová brána: otevřená")
+        elif sq_open is False:
+            self.squelch_status_label.setText("Šumová brána: zavřená")
         else:
-            self.smeter_label.setText("S-metr: ---")
             self.squelch_status_label.setText("Šumová brána: ---")
+        self.smeter_label.setText("S-metr: ---")
         self.adjust_all_fonts()
 
     def get_band_label_from_khz(self, freq_khz):
