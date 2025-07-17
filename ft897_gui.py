@@ -60,6 +60,7 @@ class FT897CAT:
         self.port = None
         self.baudrate = 9600
         self.is_connected = False
+        self.ptt_active = False
         self.use_rigctl = False
         self.rig = None
         self.serial_port = None
@@ -178,33 +179,32 @@ class FT897CAT:
             return units_10hz * 10
 
     def get_smeter(self):
+        """Read raw RX status byte and extract scaled S-meter value (0-255)."""
         if not self.is_connected:
             return None
-        if self.use_rigctl:
+        with self._lock:
             try:
-                out = subprocess.check_output([
-                    "rigctl", "-m", "1023", "-r", self.port, "-s", str(self.baudrate),
-                    "l", "STRENGTH"
-                ], stderr=subprocess.DEVNULL)
-                return int(out.decode().strip())
-            except Exception:
+                self.serial_port.reset_input_buffer()
+                self.serial_port.reset_output_buffer()
+                self.serial_port.write(b'\x00\x00\x00\x00\xe7')
+                time.sleep(0.1)
+                resp = self.serial_port.read(1)
+            except Exception as e:
+                print(f"Chyba při čtení S-metu: {e}")
                 return None
-        elif self.rig:
-            try:
-                return int(self.rig.get_level(hamlib.RIG_VFO_CURR, hamlib.RIG_LEVEL_STRENGTH))
-            except Exception:
-                return None
-        else:
-            if not self._send(b"\x00\x00\x00\x00\xe7"):
-                return None
-            resp = self._read(1)
-            if not resp:
-                return None
-            return resp[0]
+
+        if not resp:
+            return None
+        raw = resp[0]
+        if raw & 0x02:
+            return 0
+        s_raw = (raw & 0xF8) >> 3
+        return s_raw * 8
 
     def ptt_on(self):
         if not self.is_connected:
             return False
+        self.ptt_active = True
         if self.use_rigctl:
             try:
                 subprocess.check_call([
@@ -224,6 +224,7 @@ class FT897CAT:
     def ptt_off(self):
         if not self.is_connected:
             return False
+        self.ptt_active = False
         if self.use_rigctl:
             try:
                 subprocess.check_call([
@@ -252,7 +253,9 @@ class StatusThread(QThread):
         while self.running:
             if self.cat.is_connected:
                 freq = self.cat.get_frequency()
-                sm = self.cat.get_smeter()
+                sm = None
+                if not self.cat.ptt_active:
+                    sm = self.cat.get_smeter()
                 if freq is not None and 100000 <= freq <= 500000000:
                     sm = sm if sm is not None else -1
                     self.status_updated.emit(freq, sm)
@@ -527,6 +530,20 @@ class RadioControlApp(QMainWindow):
                 return label
         return f"Neznámé pásmo ({freq_khz/1000:.5f} MHz)"
 
+    # Seznam prahových hodnot pro S-metr (bajtové hodnoty 0–255):
+    #   - S0:     0 <= value < 16
+    #   - S1:    16 <= value < 32
+    #   - S2:    32 <= value < 48
+    #   - S3:    48 <= value < 64
+    #   - S4:    64 <= value < 80
+    #   - S5:    80 <= value < 96
+    #   - S6:    96 <= value <112
+    #   - S7:   112 <= value <128
+    #   - S8:   128 <= value <144
+    #   - S9:   144 <= value <=255 -> pro hodnoty nad S9 přidej decibely:
+    #         extra = value - 144
+    #         db = (extra // 32) * 10
+    #         výsledek = "S9+{db}"
     def format_smeter(self, value):
         """Return human friendly S meter value from 0-255."""
         thresholds = [16 * i for i in range(1, 10)]
