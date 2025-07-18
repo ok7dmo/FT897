@@ -21,7 +21,8 @@ from serial.tools import list_ports
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QLabel, QPushButton,
     QComboBox, QMessageBox, QAction, QSizePolicy, QFontDialog,
-    QDialog, QRadioButton, QDialogButtonBox, QTabWidget, QFrame
+    QDialog, QRadioButton, QDialogButtonBox, QTabWidget, QFrame,
+    QInputDialog
 )
 from PyQt5.QtCore import Qt, QThread, pyqtSignal, QTimer
 from PyQt5.QtGui import QFont, QFontMetrics
@@ -129,11 +130,15 @@ class FT897CAT:
         return resp[0] & 0x0F
 
     def get_power_level(self):
-        """Return raw power meter level (0-15) from TX status."""
-        status = self.read_tx_status()
-        if status is None or status == 0xFF:
+        """Return raw power meter level (0-15) using the TX meter command."""
+        if not self.is_connected:
             return None
-        return (status >> 4) & 0x0F
+        if not self._send(b"\x00\x00\x00\x00\xbd"):
+            return None
+        resp = self._read(2)
+        if not resp or len(resp) < 1:
+            return None
+        return (resp[0] >> 4) & 0x0F
 
 
     def ptt_on(self):
@@ -316,7 +321,8 @@ class StatusThread(QThread):
                 power = None
                 if not self.cat.ptt_active:
                     sm = self.cat.get_smeter()
-                power = self.cat.get_power_level()
+                else:
+                    power = self.cat.get_power_level()
                 if freq is not None and 100000 <= freq <= 500000000:
                     sm = sm if sm is not None else -1
                     power = power if power is not None else -1
@@ -656,6 +662,56 @@ class RadioControlApp(QMainWindow):
         split_off.triggered.connect(self.cat.split_off)
         cat_menu.addAction(split_off)
 
+        cat_menu.addSeparator()
+
+        lock_on = QAction("LOCK ON", self)
+        lock_on.triggered.connect(self.cat.lock_on)
+        cat_menu.addAction(lock_on)
+
+        lock_off = QAction("LOCK OFF", self)
+        lock_off.triggered.connect(self.cat.lock_off)
+        cat_menu.addAction(lock_off)
+
+        clar_on = QAction("CLAR ON", self)
+        clar_on.triggered.connect(self.cat.clar_on)
+        cat_menu.addAction(clar_on)
+
+        clar_off = QAction("CLAR OFF", self)
+        clar_off.triggered.connect(self.cat.clar_off)
+        cat_menu.addAction(clar_off)
+
+        clar_freq = QAction("Nastavit CLAR offset…", self)
+        clar_freq.triggered.connect(self.prompt_clar_offset)
+        cat_menu.addAction(clar_freq)
+
+        rpt_minus = QAction("Opakovač -", self)
+        rpt_minus.triggered.connect(lambda: self.cat.set_repeater_offset_mode("minus"))
+        cat_menu.addAction(rpt_minus)
+
+        rpt_plus = QAction("Opakovač +", self)
+        rpt_plus.triggered.connect(lambda: self.cat.set_repeater_offset_mode("plus"))
+        cat_menu.addAction(rpt_plus)
+
+        rpt_simplex = QAction("Opakovač simplex", self)
+        rpt_simplex.triggered.connect(lambda: self.cat.set_repeater_offset_mode("simplex"))
+        cat_menu.addAction(rpt_simplex)
+
+        rpt_freq = QAction("Nastavit offset…", self)
+        rpt_freq.triggered.connect(self.prompt_offset_frequency)
+        cat_menu.addAction(rpt_freq)
+
+        ctcss_mode = QAction("CTCSS/DCS režim…", self)
+        ctcss_mode.triggered.connect(self.prompt_ctcss_mode)
+        cat_menu.addAction(ctcss_mode)
+
+        ctcss_tone = QAction("Nastavit CTCSS tón…", self)
+        ctcss_tone.triggered.connect(self.prompt_ctcss_tone)
+        cat_menu.addAction(ctcss_tone)
+
+        dcs_code = QAction("Nastavit DCS kód…", self)
+        dcs_code.triggered.connect(self.prompt_dcs_code)
+        cat_menu.addAction(dcs_code)
+
 
     def choose_font(self):
         font, ok = QFontDialog.getFont(QFont(self.current_font_family, 10), self)
@@ -692,6 +748,60 @@ class RadioControlApp(QMainWindow):
                 self.apply_stylesheet("light")
             else:
                 self.apply_stylesheet("contrast")
+
+    def prompt_clar_offset(self):
+        if not self.cat.is_connected:
+            QMessageBox.warning(self, "Chyba", "Rádio není připojeno.")
+            return
+        val, ok = QInputDialog.getInt(self, "CLAR offset", "Zadejte offset v Hz:", 0, -9999, 9999)
+        if ok:
+            sign = 1 if val >= 0 else -1
+            self.cat.set_clar_frequency(abs(val), sign)
+
+    def prompt_offset_frequency(self):
+        if not self.cat.is_connected:
+            QMessageBox.warning(self, "Chyba", "Rádio není připojeno.")
+            return
+        val, ok = QInputDialog.getInt(self, "Offset", "Zadejte offset v Hz:", 0, 0, 9999999)
+        if ok:
+            self.cat.set_repeater_offset_frequency(val)
+
+    def prompt_ctcss_mode(self):
+        if not self.cat.is_connected:
+            QMessageBox.warning(self, "Chyba", "Rádio není připojeno.")
+            return
+        modes = {
+            "DCS": "dcs",
+            "CTCSS": "ctcss",
+            "CTCSS dekód": "ctcss_dec",
+            "CTCSS enkód": "ctcss_enc",
+            "Vypnuto": "off",
+        }
+        item, ok = QInputDialog.getItem(self, "CTCSS/DCS", "Režim:", list(modes.keys()), 0, False)
+        if ok:
+            self.cat.set_ctcss_dcs_mode(modes[item])
+
+    def prompt_ctcss_tone(self):
+        if not self.cat.is_connected:
+            QMessageBox.warning(self, "Chyba", "Rádio není připojeno.")
+            return
+        tx, ok = QInputDialog.getDouble(self, "CTCSS TX", "Frekvence v Hz:", 88.5, 60.0, 300.0, 1)
+        if not ok:
+            return
+        rx, ok = QInputDialog.getDouble(self, "CTCSS RX", "Frekvence v Hz:", tx, 60.0, 300.0, 1)
+        if ok:
+            self.cat.set_ctcss_tone(tx, rx)
+
+    def prompt_dcs_code(self):
+        if not self.cat.is_connected:
+            QMessageBox.warning(self, "Chyba", "Rádio není připojeno.")
+            return
+        tx, ok = QInputDialog.getInt(self, "DCS TX", "Kód:", 23, 0, 511)
+        if not ok:
+            return
+        rx, ok = QInputDialog.getInt(self, "DCS RX", "Kód:", tx, 0, 511)
+        if ok:
+            self.cat.set_dcs_code(tx, rx)
 
 
 

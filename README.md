@@ -1,6 +1,6 @@
 # FT897 CAT Control
 
-This repository contains a simple PyQt5 application for controlling the Yaesu FT-897 via its CAT interface. The program can display the current frequency and S-meter, provide PTT control, and offers band presets for quick tuning.  A "Módy" menu lets you change the modulation mode (USB, LSB, CW, AM, FM, etc.) while the "CAT příkazy" menu exposes common CAT commands such as VFO switching and split mode control.  Additional presets now include CB channels, PMR446, the airband and broadcast bands.
+This repository contains a simple PyQt5 application for controlling the Yaesu FT-897 via its CAT interface. The program can display the current frequency and S-meter, provide PTT control, and offers band presets for quick tuning.  A "Módy" menu lets you change the modulation mode (USB, LSB, CW, AM, FM, etc.) while the "CAT příkazy" menu exposes CAT commands including VFO switching, split mode control, lock and clarifier functions and CTCSS/DCS configuration.  Additional presets now include CB channels, PMR446, the airband and broadcast bands.
 
 ## Power control
 
