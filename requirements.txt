@@ -1,0 +1,6 @@
+fastapi
+uvicorn[standard]
+pyserial
+jinja2
+python-multipart
+sounddevice
