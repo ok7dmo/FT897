@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="cs">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>FT-897 Dálkové ovládání</title>
+    <link rel="stylesheet" href="/static/style.css" />
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Přeskočit na hlavní obsah</a>
+    <main id="main" tabindex="-1">
+      <header class="section" aria-labelledby="title">
+        <h1 id="title">FT-897 Dálkové ovládání</h1>
+        <p>
+          Tato webová aplikace umožňuje vzdáleně ovládat radiostanici Yaesu
+          FT-897 prostřednictvím CAT příkazů a zároveň poskytuje stream zvuku z
+          připojené stanice.
+        </p>
+      </header>
+
+      <section class="section" aria-labelledby="status-heading">
+        <h2 id="status-heading">Stav radiostanice</h2>
+        <div class="alert" role="status" aria-live="polite">
+          <p>
+            <strong>Aktuální frekvence:</strong>
+            <span id="frequency">Neznámá</span>
+          </p>
+          <p>
+            <strong>PTT:</strong>
+            <span id="ptt-status">Neznámé</span>
+          </p>
+          <button id="refresh-status" type="button">Aktualizovat stav</button>
+        </div>
+      </section>
+
+      <section class="section" aria-labelledby="frequency-heading">
+        <h2 id="frequency-heading">Nastavení frekvence</h2>
+        <form id="frequency-form">
+          <label for="frequency-input">Frekvence v Hz</label>
+          <input
+            id="frequency-input"
+            name="frequency_hz"
+            type="number"
+            inputmode="numeric"
+            min="100000"
+            max="500000000"
+            required
+            aria-describedby="frequency-help"
+          />
+          <p id="frequency-help">
+            Zadejte frekvenci ve formátu Hz (například 14074000 pro 14.074 MHz).
+          </p>
+          <button type="submit">Odeslat</button>
+        </form>
+      </section>
+
+      <section class="section" aria-labelledby="ptt-heading">
+        <h2 id="ptt-heading">Ovládání PTT</h2>
+        <div role="group" aria-labelledby="ptt-heading">
+          <button id="ptt-on" type="button">Vysílat</button>
+          <button id="ptt-off" type="button">Přijímat</button>
+        </div>
+      </section>
+
+      <section class="section" aria-labelledby="command-heading">
+        <h2 id="command-heading">Vlastní CAT příkaz</h2>
+        <form id="command-form">
+          <label for="command-input">CAT příkaz</label>
+          <input id="command-input" name="command" type="text" required />
+          <button type="submit">Odeslat příkaz</button>
+        </form>
+        <div id="command-response" aria-live="polite"></div>
+      </section>
+
+      <section class="section" aria-labelledby="audio-heading">
+        <h2 id="audio-heading">Audio stream</h2>
+        <p>
+          Níže můžete poslouchat aktuální zvuk ze stanice. Stream je dostupný ve
+          formátu WAV a lze jej přehrávat v běžných prohlížečích.
+        </p>
+        <audio controls preload="none" aria-label="Audio stream FT-897">
+          <source src="/audio/stream" type="audio/wav" />
+          Váš prohlížeč nepodporuje přehrávání audio streamu.
+        </audio>
+      </section>
+    </main>
+
+    <script>
+      async function fetchJSON(url, options = {}) {
+        const response = await fetch(url, options);
+        if (!response.ok) {
+          const error = await response.json().catch(() => ({}));
+          throw new Error(error.detail || response.statusText);
+        }
+        return response.json();
+      }
+
+      async function refreshStatus() {
+        try {
+          const freqData = await fetchJSON("/api/frequency");
+          const pttData = await fetchJSON("/api/ptt");
+          document.getElementById("frequency").textContent =
+            freqData.frequency_hz.toLocaleString("cs-CZ");
+          document.getElementById("ptt-status").textContent = pttData.ptt
+            ? "Vysílá"
+            : "Přijímá";
+        } catch (error) {
+          document.getElementById("frequency").textContent = "Chyba";
+          document.getElementById("ptt-status").textContent = "Chyba";
+          console.error(error);
+        }
+      }
+
+      document
+        .getElementById("refresh-status")
+        .addEventListener("click", refreshStatus);
+
+      document
+        .getElementById("frequency-form")
+        .addEventListener("submit", async (event) => {
+          event.preventDefault();
+          const formData = new FormData(event.target);
+          const frequency_hz = Number(formData.get("frequency_hz"));
+          try {
+            await fetchJSON("/api/frequency", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ frequency_hz }),
+            });
+            refreshStatus();
+          } catch (error) {
+            alert(`Nepodařilo se nastavit frekvenci: ${error.message}`);
+          }
+        });
+
+      document
+        .getElementById("command-form")
+        .addEventListener("submit", async (event) => {
+          event.preventDefault();
+          const formData = new FormData(event.target);
+          const command = formData.get("command");
+          try {
+            const result = await fetchJSON("/api/command", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ command }),
+            });
+            document.getElementById(
+              "command-response"
+            ).textContent = `Odpověď: ${result.response}`;
+          } catch (error) {
+            document.getElementById("command-response").textContent =
+              "Chyba: " + error.message;
+          }
+        });
+
+      document.getElementById("ptt-on").addEventListener("click", async () => {
+        try {
+          await fetchJSON("/api/ptt", {
+            method: "POST",
+            body: new URLSearchParams({ active: "true" }),
+          });
+          refreshStatus();
+        } catch (error) {
+          alert(`Nepodařilo se aktivovat PTT: ${error.message}`);
+        }
+      });
+
+      document.getElementById("ptt-off").addEventListener("click", async () => {
+        try {
+          await fetchJSON("/api/ptt", {
+            method: "POST",
+            body: new URLSearchParams({ active: "false" }),
+          });
+          refreshStatus();
+        } catch (error) {
+          alert(`Nepodařilo se deaktivovat PTT: ${error.message}`);
+        }
+      });
+
+      refreshStatus();
+    </script>
+  </body>
+</html>
