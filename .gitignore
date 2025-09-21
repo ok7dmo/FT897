@@ -1,0 +1,11 @@
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Virtual environments
+.venv/
+venv/
+
+# Editor directories
+.vscode/
+.idea/
